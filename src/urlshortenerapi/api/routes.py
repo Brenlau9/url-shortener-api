@@ -1,7 +1,11 @@
-from fastapi import APIRouter, status, HTTPException
+from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.responses import RedirectResponse
 from urlshortenerapi.schemas.links import CreateLinkRequest, LinkResponse
+from sqlalchemy.orm import Session
+from urlshortenerapi.db.session import get_db
+from urlshortenerapi.db.models import Link
 from datetime import datetime, timezone
+import secrets
 
 router = APIRouter(prefix="/api/v1")
 
@@ -9,13 +13,25 @@ router = APIRouter(prefix="/api/v1")
           response_model=LinkResponse, 
           status_code=status.HTTP_201_CREATED
 )
-def create_link(req: CreateLinkRequest):
-    return LinkResponse(
-        code="abc123",
-        long_url=req.url,
+def create_link(req: CreateLinkRequest, db: Session = Depends(get_db)):
+    code = secrets.token_urlsafe(6)
+
+    link = Link(
+        code=code,
+        long_url=str(req.url),
         created_at=datetime.now(timezone.utc),
+    )
+
+    db.add(link)
+    db.commit()
+    db.refresh(link)
+
+    return LinkResponse(
+        code=link.code,
+        long_url=link.long_url,
+        created_at=link.created_at,
         expires_at=None,
-        is_active=True,
+        is_active=link.is_active,
     )
 
 @router.get("/{code}")
