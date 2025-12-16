@@ -33,13 +33,3 @@ def create_link(req: CreateLinkRequest, db: Session = Depends(get_db)):
         expires_at=None,
         is_active=link.is_active,
     )
-
-@router.get("/{code}")
-def redirect(code: str):
-    if code != "abc123":
-        raise HTTPException(status_code=404, detail="Not found")
-    
-    return RedirectResponse(
-        url="https://example.com",
-        status_code=307
-    )
