@@ -9,8 +9,6 @@ from urlshortenerapi.db.base import Base
 from urlshortenerapi.db import models
 from urlshortenerapi.db.models import Link
 
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(title="URL Shortener API")
 app.include_router(api_router)
 

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, status, HTTPException, Depends
 from fastapi.responses import RedirectResponse
-from urlshortenerapi.schemas.links import CreateLinkRequest, LinkResponse
+from urlshortenerapi.schemas.links import CreateLinkRequest, LinkResponse, LinkStatsResponse
 from sqlalchemy.orm import Session
 from urlshortenerapi.db.session import get_db
 from urlshortenerapi.db.models import Link
@@ -33,3 +33,13 @@ def create_link(req: CreateLinkRequest, db: Session = Depends(get_db)):
         expires_at=None,
         is_active=link.is_active,
     )
+
+@router.get("/links/{code}", response_model=LinkStatsResponse)
+def get_link_stats(code: str, db: Session = Depends(get_db)):
+    link = db.query(Link).filter(Link.code == code).first()
+
+    if link is None:
+        raise HTTPException(status_code=404, detail="Link not found")
+    
+    return link
+

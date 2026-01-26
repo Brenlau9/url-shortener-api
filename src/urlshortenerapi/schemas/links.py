@@ -1,4 +1,4 @@
-from pydantic import BaseModel, HttpUrl
+from pydantic import BaseModel, HttpUrl, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -13,4 +13,14 @@ class LinkResponse(BaseModel):
     created_at: datetime
     expires_at: Optional[datetime]
     is_active: bool
+
+class LinkStatsResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    long_url: str
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    is_active: bool
+    click_count: int
 
