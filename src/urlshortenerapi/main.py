@@ -4,6 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import update
 
 from urlshortenerapi.api.routes import router as api_router
+from urlshortenerapi.api.deps import redirect_rate_limiter
 from urlshortenerapi.db.session import engine, get_db
 from urlshortenerapi.db.base import Base
 from urlshortenerapi.db import models
@@ -28,7 +29,7 @@ def redirect(code: str, db: Session = Depends(get_db)):
     return RedirectResponse(url=link.long_url, status_code=307)
 
 @app.get("/{code}")
-def redirect(code: str, db: Session = Depends(get_db)):
+def redirect(code: str, db: Session = Depends(get_db), _: None = Depends(redirect_rate_limiter)):
     link = db.query(Link).filter(Link.code == code).first()
 
     if link is None:

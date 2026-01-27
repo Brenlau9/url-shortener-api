@@ -46,3 +46,17 @@ def test_get_link_stats_not_found():
 def test_redirect_not_found():
     resp = client.get("/nope")
     assert resp.status_code == 404
+
+def test_redirect_rate_limited():
+    # Create a link
+    create = client.post("/api/v1/links", json={"url": "https://example.com"})
+    assert create.status_code == 201
+    code = create.json()["code"]
+
+    # Hit redirect more than limit
+    # NOTE: This depends on your configured REDIRECT_LIMIT (set to 60 above).
+    # For tests, you'd ideally set REDIRECT_LIMIT to something small via env.
+    for _ in range(4):
+        last = client.get(f"/{code}", follow_redirects=False)
+
+    assert last.status_code == 429
