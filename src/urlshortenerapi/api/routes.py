@@ -28,6 +28,7 @@ def create_link(
         code=code,
         long_url=str(req.url),
         created_at=datetime.now(timezone.utc),
+        owner_api_key_id=api_key.id,
     )
 
     db.add(link)
@@ -48,7 +49,11 @@ def get_link_stats(
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key)
     ):
-    link = db.query(Link).filter(Link.code == code).first()
+    link = (
+    db.query(Link)
+    .filter(Link.code == code, Link.owner_api_key_id == api_key.id)
+    .first()
+    )
 
     if link is None:
         raise HTTPException(status_code=404, detail="Link not found")

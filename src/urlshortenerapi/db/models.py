@@ -6,6 +6,7 @@ from sqlalchemy import (
     BigInteger,
     DateTime,
     func,
+    ForeignKey,
 )
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -21,6 +22,13 @@ class Link(Base):
         UUID(as_uuid=True),
         primary_key=True,
         default=uuid.uuid4,
+    )
+
+    owner_api_key_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("api_keys.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
 
     code: Mapped[str] = mapped_column(
@@ -78,9 +86,8 @@ class ApiKey(Base):
         default=uuid.uuid4,
     )
 
-    # Store ONLY a hash of the API key (never plaintext)
     key_hash: Mapped[str] = mapped_column(
-        String(64),  # sha256 hex digest length
+        String(64),
         nullable=False,
         unique=True,
         index=True,
@@ -97,3 +104,4 @@ class ApiKey(Base):
         nullable=False,
         server_default=func.now(),
     )
+
