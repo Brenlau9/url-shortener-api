@@ -7,13 +7,21 @@ from urlshortenerapi.db.models import Link
 from datetime import datetime, timezone
 import secrets
 
+from urlshortenerapi.api.deps import get_current_api_key
+from urlshortenerapi.db.models import ApiKey
+
+
 router = APIRouter(prefix="/api/v1")
 
 @router.post("/links", 
           response_model=LinkResponse, 
           status_code=status.HTTP_201_CREATED
 )
-def create_link(req: CreateLinkRequest, db: Session = Depends(get_db)):
+def create_link(
+    req: CreateLinkRequest, 
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key)
+    ):
     code = secrets.token_urlsafe(6)
 
     link = Link(
@@ -35,7 +43,11 @@ def create_link(req: CreateLinkRequest, db: Session = Depends(get_db)):
     )
 
 @router.get("/links/{code}", response_model=LinkStatsResponse)
-def get_link_stats(code: str, db: Session = Depends(get_db)):
+def get_link_stats(
+    code: str, 
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key)
+    ):
     link = db.query(Link).filter(Link.code == code).first()
 
     if link is None:
