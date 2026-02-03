@@ -1,10 +1,4 @@
-from fastapi.testclient import TestClient
-from urlshortenerapi.main import app
-
-client = TestClient(app)
-
-
-def test_create_link():
+def test_create_link(client):
     resp = client.post(
         "/api/v1/links",
         json={"url": "https://example.com"},
@@ -16,7 +10,7 @@ def test_create_link():
     assert len(body["code"]) > 0
 
 
-def test_get_link_stats():
+def test_get_link_stats(client):
     # Create a link first
     create = client.post(
         "/api/v1/links",
@@ -38,24 +32,23 @@ def test_get_link_stats():
     assert isinstance(data["click_count"], int)
 
 
-def test_get_link_stats_not_found():
+def test_get_link_stats_not_found(client):
     resp = client.get("/api/v1/links/NOTAREALCODE123")
     assert resp.status_code == 404
 
 
-def test_redirect_not_found():
+def test_redirect_not_found(client):
     resp = client.get("/nope")
     assert resp.status_code == 404
 
-def test_redirect_rate_limited():
+
+def test_redirect_rate_limited(client):
     # Create a link
     create = client.post("/api/v1/links", json={"url": "https://example.com"})
     assert create.status_code == 201
     code = create.json()["code"]
 
-    # Hit redirect more than limit
-    # NOTE: This depends on your configured REDIRECT_LIMIT (set to 60 above).
-    # For tests, you'd ideally set REDIRECT_LIMIT to something small via env.
+    # REDIRECT_LIMIT is set to 3 in conftest.py, so the 4th request should be 429
     for _ in range(4):
         last = client.get(f"/{code}", follow_redirects=False)
 
