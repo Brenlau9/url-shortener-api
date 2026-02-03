@@ -68,3 +68,32 @@ class Link(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+
+class ApiKey(Base):
+    __tablename__ = "api_keys"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+
+    # Store ONLY a hash of the API key (never plaintext)
+    key_hash: Mapped[str] = mapped_column(
+        String(64),  # sha256 hex digest length
+        nullable=False,
+        unique=True,
+        index=True,
+    )
+
+    name: Mapped[str] = mapped_column(
+        String(64),
+        nullable=False,
+        default="default",
+    )
+
+    created_at: Mapped[DateTime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
