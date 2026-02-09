@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, Request
 from redis import Redis
 
 from urlshortenerapi.core.redis import get_redis_client
-from urlshortenerapi.services.rate_limiter import check_rate_limit
+from urlshortenerapi.services.rate_limiter import check_rate_limit, check_token_bucket
 
 import os
 
@@ -66,4 +66,43 @@ def get_current_api_key(
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     return api_key
+
+def create_rate_limiter(
+    request: Request,
+    api_key: ApiKey = Depends(get_current_api_key),
+    r: Redis = Depends(get_redis_client),
+) -> None:
+    """
+    Per-API-key token bucket limiter for POST /api/v1/links.
+    Runtime env read so tests and deployments can change limits without reload.
+    """
+    create_limit = int(os.getenv("CREATE_LIMIT", "60"))
+    create_window = int(os.getenv("CREATE_WINDOW", "60"))
+
+    key = f"rate:create:{api_key.id}"
+
+    result = check_token_bucket(
+        r,
+        key=key,
+        capacity=create_limit,
+        window_seconds=create_window,
+        cost=1,
+        ttl_seconds=create_window * 2,
+    )
+
+    # Store for route to set headers on success
+    request.state.create_rl_limit = create_limit
+    request.state.create_rl_remaining = result.remaining
+    request.state.create_rl_retry_after = result.retry_after
+
+    if not result.allowed:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Too many create requests. Try again in {result.retry_after} seconds.",
+            headers={
+                "Retry-After": str(result.retry_after),
+                "X-RateLimit-Limit": str(create_limit),
+                "X-RateLimit-Remaining": str(result.remaining),
+            },
+        )
 

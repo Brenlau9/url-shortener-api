@@ -8,6 +8,9 @@ from datetime import datetime, timezone, timedelta
 import secrets
 
 from urlshortenerapi.api.deps import get_current_api_key
+from fastapi import Request, Response
+from urlshortenerapi.api.deps import create_rate_limiter
+
 
 
 router = APIRouter(prefix="/api/v1")
@@ -24,12 +27,18 @@ def _base62_code(length: int) -> str:
     response_model=LinkResponse,
     status_code=status.HTTP_201_CREATED,
 )
+@router.post("/links", response_model=LinkResponse, status_code=status.HTTP_201_CREATED)
 def create_link(
     req: CreateLinkRequest,
     request: Request,
+    response: Response,
+    _: None = Depends(create_rate_limiter),
     db: Session = Depends(get_db),
     api_key: ApiKey = Depends(get_current_api_key),
 ):
+    # set headers using what deps.py stored
+    response.headers["X-RateLimit-Limit"] = str(request.state.create_rl_limit)
+    response.headers["X-RateLimit-Remaining"] = str(request.state.create_rl_remaining)
     # Compute expires_at
     expires_at = None
     if req.expires_in_seconds is not None:

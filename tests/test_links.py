@@ -185,3 +185,41 @@ def test_redirect_increments_click_count_and_updates_last_accessed_at(client_a):
     after = _get_link_row(code)
     assert after["click_count"] == before["click_count"] + 1
     assert after["last_accessed_at"] is not None
+
+def test_create_rate_limit_returns_429_and_headers(client_a, api_key_a):
+    import os
+    import hashlib
+    from sqlalchemy import create_engine, text
+    from urlshortenerapi.core.config import settings
+    from urlshortenerapi.core.redis import get_redis_client
+
+    # Tight limit for test
+    os.environ["CREATE_LIMIT"] = "3"
+    os.environ["CREATE_WINDOW"] = "60"
+
+    # Look up api_key_id so we can clear Redis key for isolation
+    key_hash = hashlib.sha256(api_key_a.encode("utf-8")).hexdigest()
+    engine = create_engine(settings.database_url)
+
+    with engine.connect() as conn:
+        api_key_id = conn.execute(
+            text("SELECT id FROM api_keys WHERE key_hash = :kh"),
+            {"kh": key_hash},
+        ).scalar_one()
+
+    r = get_redis_client()
+    r.delete(f"rate:create:{api_key_id}")
+
+    # 3 allowed requests
+    for _ in range(3):
+        resp = client_a.post("/api/v1/links", json={"url": "https://example.com"})
+        assert resp.status_code == 201
+        assert resp.headers.get("X-RateLimit-Limit") == "3"
+        assert "X-RateLimit-Remaining" in resp.headers
+
+    # 4th should be blocked
+    resp4 = client_a.post("/api/v1/links", json={"url": "https://example.com"})
+    assert resp4.status_code == 429
+    assert resp4.headers.get("X-RateLimit-Limit") == "3"
+    assert "X-RateLimit-Remaining" in resp4.headers
+    assert "Retry-After" in resp4.headers
