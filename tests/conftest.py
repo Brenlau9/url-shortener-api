@@ -43,9 +43,17 @@ def api_key_b() -> str:
     return raw
 
 
+import pytest
+from fastapi.testclient import TestClient
+
+from urlshortenerapi.main import app
+from urlshortenerapi.api.deps import redirect_rate_limiter
+
+
 @pytest.fixture()
 def client_a(api_key_a: str) -> TestClient:
-    from urlshortenerapi.main import app
+    # Override redirect rate limiter for test determinism
+    app.dependency_overrides[redirect_rate_limiter] = lambda: None
 
     c = TestClient(app)
     c.headers.update({"X-API-Key": api_key_a})
@@ -54,8 +62,9 @@ def client_a(api_key_a: str) -> TestClient:
 
 @pytest.fixture()
 def client_b(api_key_b: str) -> TestClient:
-    from urlshortenerapi.main import app
+    app.dependency_overrides[redirect_rate_limiter] = lambda: None
 
     c = TestClient(app)
     c.headers.update({"X-API-Key": api_key_b})
     return c
+
