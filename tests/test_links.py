@@ -223,3 +223,47 @@ def test_create_rate_limit_returns_429_and_headers(client_a, api_key_a):
     assert resp4.headers.get("X-RateLimit-Limit") == "3"
     assert "X-RateLimit-Remaining" in resp4.headers
     assert "Retry-After" in resp4.headers
+
+def test_list_links_owner_only(client_a, client_b):
+    client_a.post("/api/v1/links", json={"url": "https://example.com"})
+    client_a.post("/api/v1/links", json={"url": "https://example.com/a"})
+
+    la = client_a.get("/api/v1/links?limit=50")
+    assert la.status_code == 200
+    assert len(la.json()["items"]) == 2
+
+    lb = client_b.get("/api/v1/links?limit=50")
+    assert lb.status_code == 200
+    assert len(lb.json()["items"]) == 0
+
+
+def test_list_links_cursor_pagination(client_a):
+    for i in range(3):
+        r = client_a.post("/api/v1/links", json={"url": f"https://example.com/{i}"})
+        assert r.status_code == 201
+
+    p1 = client_a.get("/api/v1/links?limit=2").json()
+    assert len(p1["items"]) == 2
+    assert p1["next_cursor"] is not None
+
+    p2 = client_a.get(f"/api/v1/links?limit=2&cursor={p1['next_cursor']}").json()
+    assert len(p2["items"]) == 1
+    assert p2["next_cursor"] is None
+
+
+def test_patch_disable_link_owner_only(client_a, client_b):
+    code = client_a.post("/api/v1/links", json={"url": "https://example.com"}).json()["code"]
+
+    # B can't disable A's link
+    bad = client_b.patch(f"/api/v1/links/{code}", json={"is_active": False})
+    assert bad.status_code == 404
+
+    # A disables
+    ok = client_a.patch(f"/api/v1/links/{code}", json={"is_active": False})
+    assert ok.status_code == 200
+    assert ok.json()["is_active"] is False
+
+    # redirect is now 403
+    redir = client_a.get(f"/{code}", follow_redirects=False)
+    assert redir.status_code == 403
+

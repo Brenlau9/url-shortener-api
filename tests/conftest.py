@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from urlshortenerapi.main import app
 from urlshortenerapi.api.deps import redirect_rate_limiter
+from urlshortenerapi.core.redis import get_redis_client
 
 
 os.environ.setdefault("REDIRECT_LIMIT", "3")
@@ -51,17 +52,24 @@ def api_key_b() -> str:
 def isolate_db():
     """
     Full test isolation:
-    - Wipe links table before each test so aliases/codes never collide across runs.
+    - Wipe links table before each test
+    - Clear Redis rate limiter keys so POST /links doesn't randomly 429
     """
     from urlshortenerapi.core.config import settings
 
+    # --- DB isolation ---
     engine = create_engine(settings.database_url)
-
     with engine.begin() as conn:
-        # Postgres: TRUNCATE is fast and resets state.
-        # RESTART IDENTITY resets any serial/identity counters (safe even if none exist).
-        # CASCADE handles dependent tables if you add click_events later.
         conn.execute(text("TRUNCATE TABLE links RESTART IDENTITY CASCADE;"))
+
+    # --- Redis isolation ---
+    r = get_redis_client()
+    # remove create limiter keys (per API key)
+    for k in r.scan_iter("rate:create:*"):
+        r.delete(k)
+    # (optional) if you want redirect limiter isolated too:
+    for k in r.scan_iter("rl:redirect:*"):
+        r.delete(k)
 
     yield
 

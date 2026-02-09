@@ -61,3 +61,27 @@ class LinkStatsResponse(BaseModel):
     is_active: bool
     click_count: int
     max_clicks: Optional[int] = None
+
+from typing import List
+
+class LinkListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    code: str
+    long_url: str
+    created_at: datetime
+    expires_at: Optional[datetime] = None
+    is_active: bool
+    click_count: int
+    last_accessed_at: Optional[datetime] = None
+    max_clicks: Optional[int] = None
+
+
+class LinkListResponse(BaseModel):
+    items: List[LinkListItem]
+    next_cursor: Optional[str] = None
+
+
+class PatchLinkRequest(BaseModel):
+    is_active: bool
+
