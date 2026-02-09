@@ -4,8 +4,12 @@ import secrets
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.orm import Session
+
+from urlshortenerapi.main import app
+from urlshortenerapi.api.deps import redirect_rate_limiter
+
 
 os.environ.setdefault("REDIRECT_LIMIT", "3")
 os.environ.setdefault("REDIRECT_WINDOW", "60")
@@ -43,16 +47,28 @@ def api_key_b() -> str:
     return raw
 
 
-import pytest
-from fastapi.testclient import TestClient
+@pytest.fixture(autouse=True)
+def isolate_db():
+    """
+    Full test isolation:
+    - Wipe links table before each test so aliases/codes never collide across runs.
+    """
+    from urlshortenerapi.core.config import settings
 
-from urlshortenerapi.main import app
-from urlshortenerapi.api.deps import redirect_rate_limiter
+    engine = create_engine(settings.database_url)
+
+    with engine.begin() as conn:
+        # Postgres: TRUNCATE is fast and resets state.
+        # RESTART IDENTITY resets any serial/identity counters (safe even if none exist).
+        # CASCADE handles dependent tables if you add click_events later.
+        conn.execute(text("TRUNCATE TABLE links RESTART IDENTITY CASCADE;"))
+
+    yield
 
 
 @pytest.fixture()
 def client_a(api_key_a: str) -> TestClient:
-    # Override redirect rate limiter for test determinism
+    # Override redirect rate limiter for determinism in redirect tests
     app.dependency_overrides[redirect_rate_limiter] = lambda: None
 
     c = TestClient(app)
@@ -67,4 +83,3 @@ def client_b(api_key_b: str) -> TestClient:
     c = TestClient(app)
     c.headers.update({"X-API-Key": api_key_b})
     return c
-
