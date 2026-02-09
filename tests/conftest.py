@@ -7,20 +7,15 @@ from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
-# Set test-friendly rate limits BEFORE importing the app/settings anywhere
 os.environ.setdefault("REDIRECT_LIMIT", "3")
 os.environ.setdefault("REDIRECT_WINDOW", "60")
 
 
 def _hash_api_key(raw_key: str) -> str:
-    # Must match urlshortenerapi.api.deps.hash_api_key
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
 
 
-def _ensure_api_key_in_db(name: str, raw_key: str) -> None:
-    """
-    Insert an ApiKey row for raw_key (store only the hash). Safe to call repeatedly.
-    """
+def _ensure_api_key(name: str, raw_key: str) -> None:
     from urlshortenerapi.core.config import settings
     from urlshortenerapi.db.models import ApiKey
 
@@ -37,14 +32,14 @@ def _ensure_api_key_in_db(name: str, raw_key: str) -> None:
 @pytest.fixture(scope="session")
 def api_key_a() -> str:
     raw = "sk_test_a_" + secrets.token_urlsafe(24)
-    _ensure_api_key_in_db("test-a", raw)
+    _ensure_api_key("test-a", raw)
     return raw
 
 
 @pytest.fixture(scope="session")
 def api_key_b() -> str:
     raw = "sk_test_b_" + secrets.token_urlsafe(24)
-    _ensure_api_key_in_db("test-b", raw)
+    _ensure_api_key("test-b", raw)
     return raw
 
 

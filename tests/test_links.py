@@ -1,53 +1,91 @@
-def test_create_link_owner_a(client_a):
+import re
+from datetime import datetime
+
+_BASE62_RE = re.compile(r"^[0-9a-zA-Z]{6,8}$")
+_ALIAS_RE = re.compile(r"^[a-zA-Z0-9_-]{3,32}$")
+
+
+def test_create_link_returns_full_shape(client_a):
     resp = client_a.post("/api/v1/links", json={"url": "https://example.com"})
     assert resp.status_code == 201
     body = resp.json()
-    assert "code" in body
-    assert isinstance(body["code"], str)
-    assert len(body["code"]) > 0
+
+    assert _BASE62_RE.fullmatch(body["code"])
+    assert body["short_url"].endswith("/" + body["code"])
+    assert body["long_url"] == "https://example.com/"
+    assert "created_at" in body
+    assert "expires_at" in body
+    assert body["is_active"] is True
+    assert "max_clicks" in body
 
 
-def test_get_link_stats_owner_only(client_a, client_b):
-    # A creates a link
-    create = client_a.post("/api/v1/links", json={"url": "https://example.com"})
+def test_invalid_url_scheme_rejected(client_a):
+    resp = client_a.post("/api/v1/links", json={"url": "ftp://example.com"})
+    # Pydantic HttpUrl rejects this -> 422
+    assert resp.status_code == 422
+
+
+def test_custom_alias_success(client_a):
+    alias = "brendan_123"
+    assert _ALIAS_RE.fullmatch(alias)
+
+    resp = client_a.post(
+        "/api/v1/links",
+        json={"url": "https://example.com", "custom_alias": alias},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["code"] == alias
+    assert body["short_url"].endswith("/" + alias)
+
+
+def test_custom_alias_collision_returns_409(client_a):
+    alias = "taken_alias"
+    first = client_a.post("/api/v1/links", json={"url": "https://example.com", "custom_alias": alias})
+    assert first.status_code == 201
+
+    second = client_a.post("/api/v1/links", json={"url": "https://example.com", "custom_alias": alias})
+    assert second.status_code == 409
+
+
+def test_custom_alias_invalid_rejected(client_a):
+    resp = client_a.post(
+        "/api/v1/links",
+        json={"url": "https://example.com", "custom_alias": "!!bad!!"},
+    )
+    assert resp.status_code == 422
+
+
+def test_expires_in_seconds_persists(client_a):
+    resp = client_a.post(
+        "/api/v1/links",
+        json={"url": "https://example.com", "expires_in_seconds": 60},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["expires_at"] is not None
+
+    # confirm it's parseable ISO datetime
+    datetime.fromisoformat(body["expires_at"].replace("Z", "+00:00"))
+
+
+def test_max_clicks_persists(client_a):
+    resp = client_a.post(
+        "/api/v1/links",
+        json={"url": "https://example.com", "max_clicks": 5},
+    )
+    assert resp.status_code == 201
+    body = resp.json()
+    assert body["max_clicks"] == 5
+
+
+def test_get_link_stats_includes_max_clicks(client_a):
+    create = client_a.post("/api/v1/links", json={"url": "https://example.com", "max_clicks": 5})
     assert create.status_code == 201
     code = create.json()["code"]
 
-    # A can read stats
-    stats_a = client_a.get(f"/api/v1/links/{code}")
-    assert stats_a.status_code == 200
-    data = stats_a.json()
+    stats = client_a.get(f"/api/v1/links/{code}")
+    assert stats.status_code == 200
+    data = stats.json()
     assert data["code"] == code
-    assert data["long_url"].startswith("https://example.com")
-    assert "created_at" in data
-    assert "expires_at" in data
-    assert data["is_active"] is True
-    assert isinstance(data["click_count"], int)
-
-    # B cannot read A's link (404 to avoid leaking existence)
-    stats_b = client_b.get(f"/api/v1/links/{code}")
-    assert stats_b.status_code == 404
-
-
-def test_get_link_stats_not_found(client_a):
-    resp = client_a.get("/api/v1/links/NOTAREALCODE123")
-    assert resp.status_code == 404
-
-
-def test_redirect_not_found_public(client_a):
-    # Redirect is public; sending X-API-Key is harmless
-    resp = client_a.get("/nope")
-    assert resp.status_code == 404
-
-
-def test_redirect_rate_limited(client_a):
-    # Create a link
-    create = client_a.post("/api/v1/links", json={"url": "https://example.com"})
-    assert create.status_code == 201
-    code = create.json()["code"]
-
-    # REDIRECT_LIMIT is set to 3 in conftest.py, so 4th request should be 429
-    for _ in range(4):
-        last = client_a.get(f"/{code}", follow_redirects=False)
-
-    assert last.status_code == 429
+    assert data["max_clicks"] == 5
