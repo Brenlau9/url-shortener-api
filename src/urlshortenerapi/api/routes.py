@@ -184,6 +184,25 @@ def get_link_stats(
 
     return link
 
+@router.get("/links/{code}/analytics", response_model=LinkAnalyticsResponse)
+def get_link_analytics(
+    code: str,
+    db: Session = Depends(get_db),
+    api_key: ApiKey = Depends(get_current_api_key),
+):
+    link = (
+        db.query(Link)
+        .filter(Link.code == code, Link.owner_api_key_id == api_key.id)
+        .first()
+    )
+    if link is None:
+        # 404 prevents leaking cross-tenant existence
+        raise HTTPException(status_code=404, detail="Link not found")
+
+    return LinkAnalyticsResponse(
+        click_count=int(link.click_count),
+        last_accessed_at=link.last_accessed_at,
+    )
 
 @router.patch("/links/{code}", response_model=LinkStatsResponse)
 def patch_link(
@@ -206,23 +225,3 @@ def patch_link(
     db.commit()
     db.refresh(link)
     return link
-
-@router.get("/links/{code}/analytics", response_model=LinkAnalyticsResponse)
-def get_link_analytics(
-    code: str,
-    db: Session = Depends(get_db),
-    api_key: ApiKey = Depends(get_current_api_key),
-):
-    link = (
-        db.query(Link)
-        .filter(Link.code == code, Link.owner_api_key_id == api_key.id)
-        .first()
-    )
-    if link is None:
-        # 404 prevents leaking cross-tenant existence
-        raise HTTPException(status_code=404, detail="Link not found")
-
-    return LinkAnalyticsResponse(
-        click_count=int(link.click_count),
-        last_accessed_at=link.last_accessed_at,
-    )
