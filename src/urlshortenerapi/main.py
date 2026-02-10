@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 
-from fastapi import FastAPI, HTTPException, Depends
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.responses import RedirectResponse, JSONResponse
+from fastapi.exceptions import RequestValidationError
 from sqlalchemy.orm import Session
 from sqlalchemy import update
 
@@ -9,10 +10,39 @@ from urlshortenerapi.api.routes import router as api_router
 from urlshortenerapi.api.deps import redirect_rate_limiter
 from urlshortenerapi.db.session import get_db
 from urlshortenerapi.db.models import Link
+from urlshortenerapi.core.errors import normalize_http_exception, STATUS_TO_ERROR_CODE
 
 app = FastAPI(title="URL Shortener API")
 app.include_router(api_router)
 
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    err = normalize_http_exception(exc)
+    # Preserve headers like Retry-After (important for 429)
+    headers = getattr(exc, "headers", None)
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"error": {"code": err.code, "message": err.message}},
+        headers=headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    # Keep message simple (or concatenate field errors if you want)
+    return JSONResponse(
+        status_code=422,
+        content={"error": {"code": STATUS_TO_ERROR_CODE[422], "message": "Invalid request body or parameters."}},
+    )
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception):
+    # Avoid leaking internals
+    return JSONResponse(
+        status_code=500,
+        content={"error": {"code": STATUS_TO_ERROR_CODE[500], "message": "Internal server error."}},
+    )
 
 @app.get("/health")
 def health():
