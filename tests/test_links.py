@@ -267,3 +267,32 @@ def test_patch_disable_link_owner_only(client_a, client_b):
     redir = client_a.get(f"/{code}", follow_redirects=False)
     assert redir.status_code == 403
 
+def test_analytics_endpoint_returns_click_count_and_last_accessed_at(client_a):
+    create = client_a.post("/api/v1/links", json={"url": "https://example.com"})
+    assert create.status_code == 201
+    code = create.json()["code"]
+
+    a0 = client_a.get(f"/api/v1/links/{code}/analytics")
+    assert a0.status_code == 200
+    body0 = a0.json()
+    assert body0["click_count"] == 0
+    assert body0["last_accessed_at"] is None
+
+    # one redirect click
+    r = client_a.get(f"/{code}", follow_redirects=False)
+    assert r.status_code == 307
+
+    a1 = client_a.get(f"/api/v1/links/{code}/analytics")
+    assert a1.status_code == 200
+    body1 = a1.json()
+    assert body1["click_count"] == 1
+    assert body1["last_accessed_at"] is not None
+
+
+def test_analytics_owner_only_returns_404(client_a, client_b):
+    create = client_a.post("/api/v1/links", json={"url": "https://example.com"})
+    assert create.status_code == 201
+    code = create.json()["code"]
+
+    resp = client_b.get(f"/api/v1/links/{code}/analytics")
+    assert resp.status_code == 404

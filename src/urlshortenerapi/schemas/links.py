@@ -85,3 +85,8 @@ class LinkListResponse(BaseModel):
 class PatchLinkRequest(BaseModel):
     is_active: bool
 
+class LinkAnalyticsResponse(BaseModel):
+    click_count: int
+    last_accessed_at: Optional[datetime] = None
+
+
