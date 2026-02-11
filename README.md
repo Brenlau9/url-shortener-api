@@ -59,7 +59,7 @@ A backend service that shortens URLs, redirects reliably, enforces per-API-key r
 
 All management endpoints require:
 
-X-API-Key: <your-api-key>
+X-API-Key: `<your-api-key>`
 
 
 Redirect (`GET /{code}`) is public.
