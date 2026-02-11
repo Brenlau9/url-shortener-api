@@ -78,7 +78,6 @@ Redirect (`GET /{code}`) is public.
     - X-RateLimit-Remaining
     - Retry-After
 
-
 ---
 
 ## Testing & Coverage
