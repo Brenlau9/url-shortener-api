@@ -2,6 +2,7 @@ from pydantic import BaseModel, HttpUrl, ConfigDict, field_validator
 from typing import Optional
 from datetime import datetime
 import re
+from typing import List
 
 
 _ALIAS_RE = re.compile(r"^[a-zA-Z0-9_-]{3,32}$")
@@ -62,7 +63,6 @@ class LinkStatsResponse(BaseModel):
     click_count: int
     max_clicks: Optional[int] = None
 
-from typing import List
 
 class LinkListItem(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -85,8 +85,7 @@ class LinkListResponse(BaseModel):
 class PatchLinkRequest(BaseModel):
     is_active: bool
 
+
 class LinkAnalyticsResponse(BaseModel):
     click_count: int
     last_accessed_at: Optional[datetime] = None
-
-

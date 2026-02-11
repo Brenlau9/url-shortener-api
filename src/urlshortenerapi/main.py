@@ -15,6 +15,7 @@ from urlshortenerapi.core.errors import normalize_http_exception, STATUS_TO_ERRO
 app = FastAPI(title="URL Shortener API")
 app.include_router(api_router)
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     err = normalize_http_exception(exc)
@@ -32,7 +33,12 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     # Keep message simple (or concatenate field errors if you want)
     return JSONResponse(
         status_code=422,
-        content={"error": {"code": STATUS_TO_ERROR_CODE[422], "message": "Invalid request body or parameters."}},
+        content={
+            "error": {
+                "code": STATUS_TO_ERROR_CODE[422],
+                "message": "Invalid request body or parameters.",
+            }
+        },
     )
 
 
@@ -43,6 +49,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
         status_code=500,
         content={"error": {"code": STATUS_TO_ERROR_CODE[500], "message": "Internal server error."}},
     )
+
 
 @app.get("/health")
 def health():

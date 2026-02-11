@@ -1,6 +1,7 @@
 import os
 import redis
 
+
 def get_redis_client() -> redis.Redis:
     """
     Creates a Redis client using REDIS_URL.

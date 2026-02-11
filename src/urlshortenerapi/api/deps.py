@@ -9,7 +9,6 @@ from urlshortenerapi.services.rate_limiter import check_rate_limit, check_token_
 import os
 
 import hashlib
-import secrets
 from fastapi import Header
 from sqlalchemy.orm import Session
 
@@ -46,6 +45,7 @@ def redirect_rate_limiter(
             detail=f"Rate limit exceeded. Try again in {result.reset_seconds}s.",
         )
 
+
 def hash_api_key(raw_key: str) -> str:
     # SHA-256 hex digest (64 chars)
     return hashlib.sha256(raw_key.encode("utf-8")).hexdigest()
@@ -66,6 +66,7 @@ def get_current_api_key(
         raise HTTPException(status_code=401, detail="Invalid API key")
 
     return api_key
+
 
 def create_rate_limiter(
     request: Request,
@@ -105,4 +106,3 @@ def create_rate_limiter(
                 "X-RateLimit-Remaining": str(result.remaining),
             },
         )
-

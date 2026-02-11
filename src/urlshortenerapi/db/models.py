@@ -77,6 +77,7 @@ class Link(Base):
         nullable=True,
     )
 
+
 class ApiKey(Base):
     __tablename__ = "api_keys"
 
@@ -104,4 +105,3 @@ class ApiKey(Base):
         nullable=False,
         server_default=func.now(),
     )
-

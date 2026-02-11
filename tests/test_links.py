@@ -1,6 +1,8 @@
 import re
 from datetime import datetime
 import secrets
+from sqlalchemy import create_engine, text
+from urlshortenerapi.core.config import settings
 
 
 _BASE62_RE = re.compile(r"^[0-9a-zA-Z]{6,8}$")
@@ -41,17 +43,19 @@ def test_custom_alias_success(client_a):
     assert body["short_url"].endswith("/" + alias)
 
 
-
 def test_custom_alias_collision_returns_409(client_a):
     alias = "taken_" + secrets.token_urlsafe(8).replace("-", "_")
     assert _ALIAS_RE.fullmatch(alias)
 
-    first = client_a.post("/api/v1/links", json={"url": "https://example.com", "custom_alias": alias})
+    first = client_a.post(
+        "/api/v1/links", json={"url": "https://example.com", "custom_alias": alias}
+    )
     assert first.status_code == 201
 
-    second = client_a.post("/api/v1/links", json={"url": "https://example.com", "custom_alias": alias})
+    second = client_a.post(
+        "/api/v1/links", json={"url": "https://example.com", "custom_alias": alias}
+    )
     assert second.status_code == 409
-
 
 
 def test_custom_alias_invalid_rejected(client_a):
@@ -96,23 +100,24 @@ def test_get_link_stats_includes_max_clicks(client_a):
     assert data["code"] == code
     assert data["max_clicks"] == 5
 
-from sqlalchemy import create_engine, text
-from urlshortenerapi.core.config import settings
-
 
 def _get_link_row(code: str) -> dict:
     engine = create_engine(settings.database_url)
     with engine.connect() as conn:
-        row = conn.execute(
-            text(
-                """
+        row = (
+            conn.execute(
+                text(
+                    """
                 SELECT code, is_active, expires_at, max_clicks, click_count, last_accessed_at, long_url
                 FROM links
                 WHERE code = :code
                 """
-            ),
-            {"code": code},
-        ).mappings().first()
+                ),
+                {"code": code},
+            )
+            .mappings()
+            .first()
+        )
         assert row is not None
         return dict(row)
 
@@ -186,6 +191,7 @@ def test_redirect_increments_click_count_and_updates_last_accessed_at(client_a):
     assert after["click_count"] == before["click_count"] + 1
     assert after["last_accessed_at"] is not None
 
+
 def test_create_rate_limit_returns_429_and_headers(client_a, api_key_a):
     import os
     import hashlib
@@ -223,6 +229,7 @@ def test_create_rate_limit_returns_429_and_headers(client_a, api_key_a):
     assert resp4.headers.get("X-RateLimit-Limit") == "3"
     assert "X-RateLimit-Remaining" in resp4.headers
     assert "Retry-After" in resp4.headers
+
 
 def test_list_links_owner_only(client_a, client_b):
     client_a.post("/api/v1/links", json={"url": "https://example.com"})
@@ -266,6 +273,7 @@ def test_patch_disable_link_owner_only(client_a, client_b):
     # redirect is now 403
     redir = client_a.get(f"/{code}", follow_redirects=False)
     assert redir.status_code == 403
+
 
 def test_analytics_endpoint_returns_click_count_and_last_accessed_at(client_a):
     create = client_a.post("/api/v1/links", json={"url": "https://example.com"})

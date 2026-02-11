@@ -62,10 +62,14 @@ def test_409_conflict_alias_taken(client_a):
     """
     alias = "taken_alias_123"
 
-    first = client_a.post("/api/v1/links", json={"url": "https://example.com", "custom_alias": alias})
+    first = client_a.post(
+        "/api/v1/links", json={"url": "https://example.com", "custom_alias": alias}
+    )
     assert first.status_code == 201
 
-    second = client_a.post("/api/v1/links", json={"url": "https://example.com/2", "custom_alias": alias})
+    second = client_a.post(
+        "/api/v1/links", json={"url": "https://example.com/2", "custom_alias": alias}
+    )
     assert second.status_code == 409
     assert_error_shape(second, "CONFLICT")
 
@@ -74,7 +78,9 @@ def test_410_gone_expired_link(client_a):
     """
     Expired link should return 410 on redirect.
     """
-    create = client_a.post("/api/v1/links", json={"url": "https://example.com", "expires_in_seconds": 1})
+    create = client_a.post(
+        "/api/v1/links", json={"url": "https://example.com", "expires_in_seconds": 1}
+    )
     assert create.status_code == 201
     code = create.json()["code"]
 

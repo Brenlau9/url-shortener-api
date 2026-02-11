@@ -1,14 +1,16 @@
 from __future__ import annotations
 from dataclasses import dataclass
-from typing import Optional
 
 from redis import Redis
+import time
+
 
 @dataclass(frozen=True)
 class RateLimitResult:
     allowed: bool
     remaining: int
     reset_seconds: int
+
 
 def check_rate_limit(
     r: Redis,
@@ -38,7 +40,6 @@ def check_rate_limit(
 
     return RateLimitResult(allowed=allowed, remaining=remaining, reset_seconds=reset_seconds)
 
-import time
 
 TOKEN_BUCKET_LUA = r"""
 local key = KEYS[1]

@@ -5,10 +5,11 @@ from urlshortenerapi.core.config import settings
 engine = create_engine(settings.database_url, echo=False)
 
 SessionLocal = sessionmaker(
-    bind = engine,
+    bind=engine,
     autoflush=False,
     autocommit=False,
 )
+
 
 def get_db():
     db = SessionLocal()
