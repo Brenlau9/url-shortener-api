@@ -22,6 +22,7 @@ RUN python -m pip install --upgrade pip \
 # Copy remaining runtime files
 COPY alembic.ini ./
 COPY alembic ./alembic
+COPY scripts ./scripts
 
 EXPOSE 8000
 
