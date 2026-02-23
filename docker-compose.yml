@@ -8,8 +8,8 @@ services:
       APP_ENV: dev
       DATABASE_URL: postgresql+psycopg://urlshortener:urlshortener@db:5432/urlshortener
       REDIS_URL: redis://redis:6379/0
-      # Optional (if you use these in your limiter):
-      CREATE_LIMIT: "60"
+
+      CREATE_LIMIT: "100000"
       CREATE_WINDOW: "60"
     depends_on:
       - db
@@ -32,6 +32,23 @@ services:
     container_name: urlshortener_redis
     ports:
       - "6379:6379"
+  
+  k6-redirect:
+    image: grafana/k6:latest
+    volumes:
+      - ./loadtest:/scripts:ro
+    environment:
+      BASE_URL: http://api:8000
+      API_KEY: ${API_KEY:-}
+      # Tuning knobs (defaults are in the script too)
+      RATE: "500"
+      DURATION: "2m"
+      NUM_LINKS: "200"
+      VUS: "100"
+      MAX_VUS: "500"
+    depends_on:
+      - api
+    entrypoint: ["k6", "run", "/scripts/redirect-heavy.k6.js"]
 
 volumes:
   urlshortener_db_data:
