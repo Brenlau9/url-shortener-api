@@ -11,6 +11,8 @@ services:
 
       CREATE_LIMIT: "100000"
       CREATE_WINDOW: "60"
+      REDIRECT_LIMIT: "100000"
+      REDIRECT_WINDOW: "60"
     depends_on:
       - db
       - redis
