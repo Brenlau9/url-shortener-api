@@ -188,6 +188,7 @@ def test_redirect_increments_click_count_and_updates_last_accessed_at(client_a):
     assert resp.status_code == 307
 
     from urlshortenerapi.core.redis import get_redis_client
+
     r = get_redis_client()
     raw = r.getdel(f"clicks:{code}")
     ts_raw = r.getdel(f"last_accessed:{code}")
@@ -304,6 +305,7 @@ def test_analytics_endpoint_returns_click_count_and_last_accessed_at(client_a):
     assert r.status_code == 307
 
     from urlshortenerapi.core.redis import get_redis_client
+
     r = get_redis_client()
     raw = r.getdel(f"clicks:{code}")
     ts_raw = r.getdel(f"last_accessed:{code}")

@@ -216,6 +216,7 @@ def patch_link(
     db.refresh(link)
 
     from urlshortenerapi.main import get_redis_client, LINK_CACHE_PREFIX
+
     get_redis_client().delete(f"{LINK_CACHE_PREFIX}{code}")
-    
+
     return link

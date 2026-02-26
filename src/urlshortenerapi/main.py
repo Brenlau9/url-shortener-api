@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 # Single shared Redis client (lru_cache = one instance, one pool)
 # ---------------------------------------------------------------------------
 
+
 @lru_cache(maxsize=1)
 def get_redis_client():
     """
@@ -63,12 +64,10 @@ async def _flush_click_counts() -> None:
                     if not raw:
                         continue
                     count = int(raw)
-                    code = key[len(CLICK_KEY_PREFIX):]
+                    code = key[len(CLICK_KEY_PREFIX) :]
 
                     ts_raw = r.getdel(f"{LAST_ACCESSED_KEY_PREFIX}{code}")
-                    last_accessed = (
-                        datetime.fromisoformat(ts_raw) if ts_raw else func.now()
-                    )
+                    last_accessed = datetime.fromisoformat(ts_raw) if ts_raw else func.now()
 
                     db.execute(
                         update(Link)
@@ -123,9 +122,7 @@ def _get_link(code: str, db: Session, r) -> Link | None:
         link.code = data["code"]
         link.long_url = data["long_url"]
         link.is_active = data["is_active"]
-        link.expires_at = (
-            datetime.fromisoformat(data["expires_at"]) if data["expires_at"] else None
-        )
+        link.expires_at = datetime.fromisoformat(data["expires_at"]) if data["expires_at"] else None
         link.max_clicks = data["max_clicks"]
         link.click_count = data["click_count"]
         return link
@@ -136,15 +133,17 @@ def _get_link(code: str, db: Session, r) -> Link | None:
         r.setex(
             cache_key,
             LINK_CACHE_TTL,
-            json.dumps({
-                "id": str(link.id),
-                "code": link.code,
-                "long_url": link.long_url,
-                "is_active": link.is_active,
-                "expires_at": link.expires_at.isoformat() if link.expires_at else None,
-                "max_clicks": link.max_clicks,
-                "click_count": link.click_count,
-            }),
+            json.dumps(
+                {
+                    "id": str(link.id),
+                    "code": link.code,
+                    "long_url": link.long_url,
+                    "is_active": link.is_active,
+                    "expires_at": link.expires_at.isoformat() if link.expires_at else None,
+                    "max_clicks": link.max_clicks,
+                    "click_count": link.click_count,
+                }
+            ),
         )
     return link
 
@@ -160,6 +159,7 @@ app.include_router(api_router)
 # ---------------------------------------------------------------------------
 # Exception handlers
 # ---------------------------------------------------------------------------
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -197,6 +197,7 @@ async def unhandled_exception_handler(request: Request, exc: Exception):
 # Health
 # ---------------------------------------------------------------------------
 
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
@@ -205,6 +206,7 @@ def health():
 # ---------------------------------------------------------------------------
 # Redirect helpers
 # ---------------------------------------------------------------------------
+
 
 def _raise_if_unusable(link: Link, now: datetime) -> None:
     if not link.is_active:
@@ -220,6 +222,7 @@ def _raise_if_unusable(link: Link, now: datetime) -> None:
 # ---------------------------------------------------------------------------
 # Redirect endpoints
 # ---------------------------------------------------------------------------
+
 
 @app.head("/{code}")
 def redirect_head(code: str, db: Session = Depends(get_db)):
