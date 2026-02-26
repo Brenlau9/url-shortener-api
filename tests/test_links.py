@@ -187,6 +187,19 @@ def test_redirect_increments_click_count_and_updates_last_accessed_at(client_a):
     resp = client_a.get(f"/{code}", follow_redirects=False)
     assert resp.status_code == 307
 
+    from urlshortenerapi.core.redis import get_redis_client
+    r = get_redis_client()
+    raw = r.getdel(f"clicks:{code}")
+    ts_raw = r.getdel(f"last_accessed:{code}")
+
+    flush_fields = {}
+    if raw:
+        flush_fields["click_count"] = int(raw)
+    if ts_raw:
+        flush_fields["last_accessed_at"] = ts_raw  # add this
+    if flush_fields:
+        _set_link_fields(code, **flush_fields)
+
     after = _get_link_row(code)
     assert after["click_count"] == before["click_count"] + 1
     assert after["last_accessed_at"] is not None
@@ -289,6 +302,19 @@ def test_analytics_endpoint_returns_click_count_and_last_accessed_at(client_a):
     # one redirect click
     r = client_a.get(f"/{code}", follow_redirects=False)
     assert r.status_code == 307
+
+    from urlshortenerapi.core.redis import get_redis_client
+    r = get_redis_client()
+    raw = r.getdel(f"clicks:{code}")
+    ts_raw = r.getdel(f"last_accessed:{code}")
+
+    flush_fields = {}
+    if raw:
+        flush_fields["click_count"] = int(raw)
+    if ts_raw:
+        flush_fields["last_accessed_at"] = ts_raw
+    if flush_fields:
+        _set_link_fields(code, **flush_fields)
 
     a1 = client_a.get(f"/api/v1/links/{code}/analytics")
     assert a1.status_code == 200

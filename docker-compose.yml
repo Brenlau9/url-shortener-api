@@ -1,6 +1,12 @@
 services:
   api:
     build: .
+    command: >
+      gunicorn urlshortenerapi.main:app
+      -k uvicorn.workers.UvicornWorker
+      -w 4
+      --bind 0.0.0.0:8000
+      --timeout 30
     container_name: urlshortener_api
     ports:
       - "8000:8000"
@@ -42,12 +48,6 @@ services:
     environment:
       BASE_URL: http://api:8000
       API_KEY: ${API_KEY:-}
-      # Tuning knobs (defaults are in the script too)
-      RATE: "500"
-      DURATION: "2m"
-      NUM_LINKS: "200"
-      VUS: "100"
-      MAX_VUS: "500"
     depends_on:
       - api
     entrypoint: ["k6", "run", "/scripts/redirect-heavy.k6.js"]
