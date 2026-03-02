@@ -3,7 +3,6 @@ import json
 import logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
-from functools import lru_cache
 
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse, JSONResponse
@@ -16,24 +15,9 @@ from urlshortenerapi.api.deps import redirect_rate_limiter
 from urlshortenerapi.db.session import get_db, SessionLocal
 from urlshortenerapi.db.models import Link
 from urlshortenerapi.core.errors import normalize_http_exception, STATUS_TO_ERROR_CODE
-from urlshortenerapi.core.redis import get_redis_client as _make_redis_client
+from urlshortenerapi.core.redis import get_redis_client
 
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Single shared Redis client (lru_cache = one instance, one pool)
-# ---------------------------------------------------------------------------
-
-
-@lru_cache(maxsize=1)
-def get_redis_client():
-    """
-    Returns a single shared Redis client for the lifetime of the process.
-    lru_cache ensures the underlying connection pool is reused across requests
-    instead of constructing a new client object on every call.
-    """
-    return _make_redis_client()
-
 
 # ---------------------------------------------------------------------------
 # Click-count buffering (Redis -> Postgres flush)
