@@ -25,7 +25,7 @@ export const options = {
   },
   thresholds: {
     http_req_failed: ["rate<0.01"],         // <1% errors
-    http_req_duration: ["p(95)<250"],       // p95 < 250ms (tune to your target)
+    http_req_duration: ["p(95)<250"],       // p95 < 250ms
   },
 };
 
@@ -53,7 +53,7 @@ export function setup() {
     });
 
     const body = res.json();
-    // Your API returns { code: "...", ... }
+    // API returns { code: "...", ... }
     if (body && body.code) codes.push(body.code);
   }
 
@@ -66,7 +66,7 @@ export default function (data) {
   const code = codes[Math.floor(Math.random() * codes.length)];
 
   // Key: do NOT follow redirects.
-  // If your endpoint returns 307/302 + Location, following it would hammer example.com instead of your API.
+  // If your endpoint returns 307/302 + Location, following it would hammer example.com instead of API.
   const res = http.get(`${BASE_URL}/${code}`, {
     redirects: 0,
   });
