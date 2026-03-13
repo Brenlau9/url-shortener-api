@@ -1,152 +1,167 @@
-# URL Shortener API (FastAPI + Postgres + Redis)
+# URL Shortener API
 
-A backend service that shortens URLs, redirects reliably, enforces per-API-key rate limits, supports link expiration and max clicks, and exposes analytics. Built with clean API design, migrations, Redis rate limiting, tests, coverage, and Docker.
+Backend URL shortener service built with FastAPI, PostgreSQL, and Redis.
+Supports authenticated link management, public redirects, rate limiting,
+expiration rules, analytics, and performance optimizations for
+high-throughput redirect traffic.
 
----
+## Tech Stack
 
-## Features
+-   FastAPI
+-   PostgreSQL
+-   Redis
+-   SQLAlchemy 2.0
+-   Alembic
+-   Pytest
+-   Docker / Docker Compose
+-   k6
 
-- Create short links with optional custom alias
-- 307 redirects via `GET /{code}`
-- Expiration support (`expires_in_seconds`)
-- Max clicks support (`max_clicks`)
-- Disable links (owner-only)
-- Owner-scoped link listing with cursor pagination
-- Analytics endpoint (click count + last accessed)
-- API key authentication via `X-API-Key`
-- Per-API-key rate limiting (Redis token bucket)
-- Standardized error responses
-- Pytest + coverage (≥80%)
-- Dockerized development environment
+## Highlights
 
----
+-   Versioned REST API (`/api/v1`)
+-   API key authentication
+-   Link ownership isolation
+-   Cursor-based pagination
+-   Redis-backed rate limiting
+-   Redis link caching
+-   Redis click-count buffering
+-   Batched analytics flush to PostgreSQL
+-   Alembic migrations
+-   Dockerized local setup
+-   GitHub Actions CI
+-   k6 load testing
 
-## Architecture Overview
+## Architecture
 
-### Stack
+### Core Components
 
-- **FastAPI** – API framework
-- **PostgreSQL** – persistent storage
-- **Redis** – rate limiting
-- **SQLAlchemy 2.0** – ORM
-- **Alembic** – migrations
-- **Pytest + pytest-cov** – testing + coverage
-- **Docker + Docker Compose** – local environment
+-   **FastAPI** serves management endpoints and redirect traffic
+-   **PostgreSQL** stores API keys, links, and persisted analytics
+-   **Redis** handles:
+    -   link caching
+    -   click-count buffering
+    -   rate limiting
+-   **Background flush task** batches buffered click counts into
+    PostgreSQL
 
 ### Data Model
 
-**api_keys**
-- id (uuid)
-- key_hash
-- name
-- created_at
+**api_keys** - `id` - `key_hash` - `name` - `created_at`
 
-**links**
-- id (uuid)
-- owner_api_key_id (fk)
-- code
-- long_url
-- created_at
-- expires_at
-- is_active
-- max_clicks
-- click_count
-- last_accessed_at
+**links** - `id` - `owner_api_key_id` - `code` - `long_url` -
+`created_at` - `expires_at` - `is_active` - `max_clicks` -
+`click_count` - `last_accessed_at`
 
----
+## Performance & Load Testing
+
+The redirect endpoint was load tested with k6 using a
+constant-arrival-rate workload to measure sustained throughput and
+latency under concurrent traffic.
+
+### Test Environment
+
+-   FastAPI with 4 Uvicorn workers
+-   PostgreSQL 16
+-   Redis 7
+-   Docker Compose on local macOS
+-   2-minute sustained runs per target rate
+
+### Optimization Summary
+
+The initial redirect path performed a synchronous PostgreSQL update on
+every request, causing the service to saturate at roughly **280 RPS**
+with p95 latency above **1.8s**.
+
+To remove this bottleneck, the redirect path was redesigned to:
+
+-   buffer click counts in Redis using atomic `INCR`
+-   cache link lookups in Redis
+-   batch analytics writes back to PostgreSQL asynchronously
+-   run with 4 Uvicorn worker processes
+
+This removed database writes from the critical redirect path.
+
+### Sustained Throughput Results
+
+| Target RPS | p95 Latency | Result |
+|-----------|-------------|--------|
+| 1500 | 9.5ms | Stable |
+| 2000 | 12.49ms | Stable |
+| 2500 | 22.61ms | Stable |
+| 3000 | 565ms | CPU saturation |
+
+**Key Result:** sustained **2,500 RPS at p95 \< 25ms** with 0% HTTP
+failures during steady-state testing.
 
 ## Authentication
 
-All management endpoints require:
+Management endpoints require:
 
-X-API-Key: `<your-api-key>`
+    X-API-Key: <your-api-key>
 
-
-Redirect (`GET /{code}`) is public.
-
----
+Public redirects do not require authentication.
 
 ## Rate Limiting
 
 `POST /api/v1/links` is rate limited per API key.
 
-- Default: 60 creates per minute
-- Implemented using Redis token bucket
-- Enforced atomically
-- Returns headers:
-    - X-RateLimit-Limit
-    - X-RateLimit-Remaining
-    - Retry-After
+-   Default: 60 creates per minute
+-   Implemented with Redis
+-   Enforced atomically
+-   Returns headers:
+    -   `X-RateLimit-Limit`
+    -   `X-RateLimit-Remaining`
+    -   `Retry-After`
 
----
-
-## Testing & Coverage
-
-Run tests:
-
-```bash
-python -m pytest
-```
-Coverage is enforced at 80%+ via pytest-cov.
-
-## 🐳 Docker Setup (Recommended)
+## Quick Start with Docker
 
 ### Requirements
-- Docker
-- Docker Compose
 
-### 1. Build and start services
-```bash
-docker compose up -d --build
-```
-### 2. Run database migrations
-```bash
-docker compose exec api alembic upgrade head
-```
-### 3. Access API
-Open:
-```bash
-http://localhost:8000/docs
-```
-## 💻 Local Setup (Without Docker)
+-   Docker
+-   Docker Compose
+
+### Start Services
+
+    docker compose up -d --build
+
+### Run Migrations
+
+    docker compose exec api alembic upgrade head
+
+### Open API Docs
+
+    http://localhost:8000/docs
+
+## Local Development
 
 ### Requirements
-Python 3.12
-Postgres
-Redis
 
-### 1. Create virtual environment
-```bash
-python -m venv .venv
-source .venv/bin/activate
-```
-### 2. Install dependencies
-```bash
-python -m pip install -e ".[dev]"
-```
-### 3. Create .env
-```ini
-DATABASE_URL=postgresql+psycopg://urlshortener:urlshortener@localhost:5432/urlshortener
-REDIS_URL=redis://localhost:6379/0
-APP_ENV=dev
-```
-### 4. Run migrations
-```bash
-alembic upgrade head
-```
-### 5. Start server
-```bash
-python -m uvicorn urlshortenerapi.main:app --reload
-```
-Open:
-```bash
-http://localhost:8000/docs
-```
-## API Usage Examples
-### Health
-```bash
-curl http://localhost:8000/health
-```
+-   Python 3.12
+-   PostgreSQL
+-   Redis
+
+### Setup
+
+    python -m venv .venv
+    source .venv/bin/activate
+    pip install -e ".[dev]"
+
+### Environment
+
+    DATABASE_URL=postgresql+psycopg://urlshortener:urlshortener@localhost:5432/urlshortener
+    REDIS_URL=redis://localhost:6379/0
+    APP_ENV=dev
+
+### Run Server
+
+    python -m uvicorn urlshortenerapi.main:app --reload
+
+## API Examples
+
+### Health Check
+
+    curl http://localhost:8000/health
+
 ### Create Short Link
 ```bash
 curl -X POST http://localhost:8000/api/v1/links \
@@ -159,6 +174,7 @@ curl -X POST http://localhost:8000/api/v1/links \
     "max_clicks": 0
   }'
 ```
+
 ### Redirect
 ```bash
 curl -I http://localhost:8000/brendan_123
@@ -168,22 +184,22 @@ curl -I http://localhost:8000/brendan_123
 curl http://localhost:8000/api/v1/links \
   -H "X-API-Key: YOUR_KEY"
 ```
-### Disable Link
-```bash
-curl -X PATCH http://localhost:8000/api/v1/links/brendan_123 \
-  -H "Content-Type: application/json" \
-  -H "X-API-Key: YOUR_KEY" \
-  -d '{ "is_active": false }'
-```
 ### Analytics
 ```bash
 curl http://localhost:8000/api/v1/links/brendan_123/analytics \
   -H "X-API-Key: YOUR_KEY"
 ```
+## Testing
+
+Run the test suite:
+
+    pytest
+
+Coverage target: **80%+**.
+
 ## Error Format
 
-All API errors follow:
-```json
+``` json
 {
   "error": {
     "code": "NOT_FOUND",
@@ -191,25 +207,20 @@ All API errors follow:
   }
 }
 ```
-Common codes:
-- UNAUTHORIZED (401)
-- FORBIDDEN (403)
-- NOT_FOUND (404)
-- CONFLICT (409)
-- GONE (410)
-- RATE_LIMITED (429)
 
-## Project Status
-- Full CRUD (minus hard delete)
-- Rate limiting implemented
-- Auth + ownership enforced
-- Error standardization complete
-- 90%+ test coverage
-- Dockerized
+Common error codes:
+
+-   `UNAUTHORIZED`
+-   `FORBIDDEN`
+-   `NOT_FOUND`
+-   `CONFLICT`
+-   `GONE`
+-   `RATE_LIMITED`
 
 ## Future Improvements
-- Daily click aggregation
-- API key rotation & expiration
-- Deployment to cloud (Render / Fly.io / AWS)
-- Structured logging
-- Metrics integration
+
+-   daily click aggregation
+-   API key rotation and expiration
+-   structured logging
+-   metrics and observability
+-   cloud deployment
